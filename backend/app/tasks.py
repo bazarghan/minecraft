@@ -229,6 +229,8 @@ def install_map(job_id: str, map_id: str, server_id: str, restart_after: bool) -
         with DbSession(sync_engine) as db:
             job = _job(db, job_id)
             job.status = JobStatus.running
+            job.progress = 5
+            db.commit()
             map_entry = db.get(Map, uuid.UUID(map_id))
             server = db.get(MinecraftServer, uuid.UUID(server_id))
             if not map_entry or not server:
@@ -238,11 +240,17 @@ def install_map(job_id: str, map_id: str, server_id: str, restart_after: bool) -
             if was_running:
                 control.stop(server)
                 server.status = ServerStatus.stopped
+            job.progress = 20
+            db.commit()
             backup_id = uuid.uuid4()
             path, size, checksum = create_backup(server.id, backup_id)
             db.add(Backup(id=backup_id, server_id=server.id, reason="automatic-pre-map-install", storage_path=str(path), file_size=size, checksum_sha256=checksum))
+            job.progress = 45
+            db.commit()
             staging = Path(tempfile.mkdtemp(prefix="msm-map-install-", dir=server_data_path(server.id).parent))
             world = extract_world(Path(map_entry.storage_path), staging / "extracted")
+            job.progress = 65
+            db.commit()
             destination = server_data_path(server.id) / server.level_name
             old = destination.with_name(f"{destination.name}.map-old")
             if old.exists():
@@ -258,10 +266,14 @@ def install_map(job_id: str, map_id: str, server_id: str, restart_after: bool) -
                 raise
             if old.exists():
                 shutil.rmtree(old)
+            job.progress = 85
+            db.commit()
             if (restart_after or was_running) and server.container_id:
                 control.start(server)
                 server.status = ServerStatus.running
                 server.last_started_at = datetime.now(UTC)
+            job.progress = 95
+            db.commit()
             job.status = JobStatus.succeeded
             job.progress = 100
             job.result = {"server_id": server_id, "backup_id": str(backup_id)}

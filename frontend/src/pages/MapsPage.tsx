@@ -1,8 +1,16 @@
-import { ExternalLink, Globe, Map as MapIcon, Search, Upload } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ExternalLink, Globe, LoaderCircle, Map as MapIcon, Search, Upload } from 'lucide-react'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { api, post } from '../api'
 import { Empty, ErrorState, Loading } from '../components/States'
 import type { Job, MapCatalog, MapCatalogEntry, MapEntry, Server } from '../types'
+
+type PendingInstall = {map: MapEntry; server: Server}
+type InstallFeedback = {
+  mapId: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  progress: number
+  message: string
+}
 
 export function MapsPage() {
   const [maps, setMaps] = useState<MapEntry[] | null>(null)
@@ -17,6 +25,9 @@ export function MapsPage() {
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
   const [serverId, setServerId] = useState('')
+  const [pendingInstall, setPendingInstall] = useState<PendingInstall | null>(null)
+  const [installing, setInstalling] = useState('')
+  const [installFeedback, setInstallFeedback] = useState<InstallFeedback | null>(null)
 
   const load = useCallback(() =>
     Promise.all([api<MapEntry[]>('/maps'), api<Server[]>('/servers')])
@@ -106,16 +117,48 @@ export function MapsPage() {
     }
   }
 
-  async function install(mapId: string) {
-    if (!serverId) {
+  function requestInstall(map: MapEntry) {
+    const server = servers.find(item => item.id === serverId)
+    if (!server) {
       setMessage('Choose a target server first.')
       return
     }
+    setPendingInstall({map, server})
+  }
+
+  async function confirmInstall() {
+    if (!pendingInstall) return
+    const {map, server} = pendingInstall
+    setPendingInstall(null)
+    setInstalling(map.id)
+    setInstallFeedback({mapId: map.id, status: 'queued', progress: 0, message: 'Waiting for the installation worker…'})
     try {
-      await post(`/maps/${mapId}/install`, { server_id: serverId, restart_after_install: true })
-      setMessage('Map installation queued. The current world will be backed up first.')
+      const job = await post<Job>(`/maps/${map.id}/install`, {server_id: server.id, restart_after_install: true})
+      for (let attempt = 0; attempt < 240; attempt += 1) {
+        await new Promise(resolve => window.setTimeout(resolve, 1000))
+        const current = await api<Job>(`/jobs/${job.id}`)
+        setInstallFeedback({
+          mapId: map.id,
+          status: current.status,
+          progress: current.progress,
+          message: installPhase(current),
+        })
+        if (current.status === 'succeeded') {
+          setMessage(`${map.name} was installed on ${server.name}.`)
+          await load()
+          return
+        }
+        if (current.status === 'failed') {
+          throw new Error(current.error || `Could not install ${map.name}.`)
+        }
+      }
+      setInstallFeedback({mapId: map.id, status: 'running', progress: 95, message: 'Installation is still running. Check the Jobs page before trying again.'})
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : 'Install failed')
+      const failure = reason instanceof Error ? reason.message : 'Install failed'
+      setInstallFeedback({mapId: map.id, status: 'failed', progress: 0, message: failure})
+      setMessage(failure)
+    } finally {
+      setInstalling('')
     }
   }
 
@@ -188,9 +231,45 @@ export function MapsPage() {
 
     <section className="panel map-section">
       <div className="panel-title"><div><p className="eyebrow">Validated archives</p><h2>Available maps</h2></div><label className="inline-select">Install target<select value={serverId} onChange={event => setServerId(event.target.value)}><option value="">Choose server</option>{servers.map(server => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label></div>
-      {error ? <ErrorState message={error} retry={load}/> : maps === null ? <Loading/> : maps.length === 0 ? <Empty title="No maps yet" detail="Choose a map above or provide your own ZIP."/> : <div className="card-grid">{maps.map(map => <article className="map-card" key={map.id}><div className="map-visual"><MapIcon/></div><StatusBadge status={map.compatibility_status}/><h3>{map.name}</h3><p>{map.description || 'No description provided.'}</p><small>{map.author || 'Unknown author'} · {(map.file_size / 1e6).toFixed(1)} MB · {map.minecraft_version || 'Version unverified'}</small><button className="button secondary wide" onClick={() => void install(map.id)}>Back up & install</button></article>)}</div>}
+      {error ? <ErrorState message={error} retry={load}/> : maps === null ? <Loading/> : maps.length === 0 ? <Empty title="No maps yet" detail="Choose a map above or provide your own ZIP."/> : <div className="card-grid">{maps.map(map => {
+        const feedback = installFeedback?.mapId === map.id ? installFeedback : null
+        const isInstalling = installing === map.id
+        return <article className="map-card" key={map.id}>
+          <div className="map-visual"><MapIcon/></div>
+          <StatusBadge status={map.compatibility_status}/>
+          <h3>{map.name}</h3>
+          <p>{map.description || 'No description provided.'}</p>
+          <small>{map.author || 'Unknown author'} · {(map.file_size / 1e6).toFixed(1)} MB · {map.minecraft_version || 'Version unverified'}</small>
+          <button className="button secondary wide" disabled={Boolean(installing)} onClick={() => requestInstall(map)}>{isInstalling && <LoaderCircle className="spin-icon" size={15}/>} {isInstalling ? 'Installing…' : 'Back up & install'}</button>
+          {feedback && <div className={`install-feedback ${feedback.status}`}>
+            <span>{feedback.status === 'succeeded' ? <CheckCircle2 size={17}/> : feedback.status === 'failed' ? <AlertCircle size={17}/> : <LoaderCircle className="spin-icon" size={17}/>}</span>
+            <div><strong>{feedback.status === 'succeeded' ? 'Installation complete' : feedback.status === 'failed' ? 'Installation failed' : `${feedback.progress}% complete`}</strong><small>{feedback.message}</small>{feedback.status !== 'succeeded' && feedback.status !== 'failed' && <span className="install-progress"><i style={{width: `${feedback.progress}%`}}/></span>}</div>
+          </div>}
+        </article>
+      })}</div>}
     </section>
+
+    {pendingInstall && <div className="modal-backdrop" role="presentation">
+      <div className="modal install-confirmation" role="dialog" aria-modal="true" aria-labelledby="install-map-title">
+        <p className="eyebrow">Confirm map installation</p>
+        <h2 id="install-map-title">Install {pendingInstall.map.name}?</h2>
+        <p>This will stop <strong>{pendingInstall.server.name}</strong>, create a safety backup of its current world, replace the world with this map, and start the server again.</p>
+        <div className="notice danger"><AlertCircle size={18}/><div><strong>Players will be disconnected briefly</strong><span>Do not start, stop, or install another map until this finishes.</span></div></div>
+        <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setPendingInstall(null)}>Cancel</button><button type="button" className="button primary" onClick={() => void confirmInstall()}>Confirm & install</button></div>
+      </div>
+    </div>}
   </div>
+}
+
+function installPhase(job: Job) {
+  if (job.status === 'queued') return 'Waiting for the installation worker…'
+  if (job.status === 'succeeded') return 'Backup created, world installed, and server started successfully.'
+  if (job.status === 'failed') return job.error || 'The installation failed.'
+  if (job.progress < 20) return 'Preparing the server…'
+  if (job.progress < 45) return 'Stopping the server and creating a safety backup…'
+  if (job.progress < 65) return 'Finishing the safety backup…'
+  if (job.progress < 85) return 'Extracting and installing the new world…'
+  return 'Starting the Minecraft server…'
 }
 
 function StatusBadge({status}: {status: string}) {
