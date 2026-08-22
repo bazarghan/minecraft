@@ -1,5 +1,6 @@
 import hashlib
 import ipaddress
+import os
 import shutil
 import socket
 import stat
@@ -143,4 +144,32 @@ def stage_download(url: str) -> tuple[Path, str, int]:
         return archive, checksum, size
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def store_archive(source: Path, destination: Path) -> None:
+    """Copy an archive into its library filesystem and publish it atomically."""
+    if destination.exists():
+        source.unlink(missing_ok=True)
+        return
+
+    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+    handle = tempfile.NamedTemporaryFile(
+        mode="wb",
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+        dir=destination.parent,
+        delete=False,
+    )
+    staged = Path(handle.name)
+    try:
+        with handle, source.open("rb") as incoming:
+            shutil.copyfileobj(incoming, handle, length=1024 * 1024)
+            handle.flush()
+            os.fsync(handle.fileno())
+        staged.chmod(0o640)
+        os.replace(staged, destination)
+        source.unlink(missing_ok=True)
+    except Exception:
+        staged.unlink(missing_ok=True)
         raise

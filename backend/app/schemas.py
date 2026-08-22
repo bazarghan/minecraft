@@ -185,6 +185,24 @@ class MapUrlImport(BaseModel):
     minecraft_version: str | None = Field(default=None, max_length=32)
 
 
+class MapCatalogEntry(BaseModel):
+    id: str
+    slug: str
+    name: str
+    description: str
+    author: str
+    minecraft_version: str
+    download_url: str
+    page_url: str
+    thumbnail_url: str
+    category: Literal["official", "community"]
+
+
+class MapCatalogOut(BaseModel):
+    source: Literal["live", "fallback"]
+    maps: list[MapCatalogEntry]
+
+
 class MapInstallRequest(BaseModel):
     server_id: uuid.UUID
     restart_after_install: bool = True

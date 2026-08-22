@@ -14,7 +14,7 @@ from .config import get_settings
 from .models import Backup, BackgroundJob, JobStatus, Map, MinecraftServer, ServerStatus, Setting
 from .services.backups import create_backup, restore_backup, server_data_path
 from .services.docker_control import DockerControl
-from .services.map_import import extract_world, inspect_zip, stage_download
+from .services.map_import import extract_world, inspect_zip, stage_download, store_archive
 
 
 settings = get_settings()
@@ -63,10 +63,7 @@ def import_map_url(job_id: str, metadata: dict) -> None:
         settings.map_library_root.mkdir(parents=True, exist_ok=True, mode=0o750)
         if settings.map_library_root.resolve() not in destination.parents:
             raise RuntimeError("Map storage path is unsafe")
-        if destination.exists():
-            archive.unlink()
-        else:
-            os.replace(archive, destination)
+        store_archive(archive, destination)
         with DbSession(sync_engine) as db:
             job = _job(db, job_id)
             existing = db.scalar(select(Map).where(Map.checksum_sha256 == checksum))

@@ -90,6 +90,24 @@ export interface MapEntry {
   created_at: string
 }
 
+export interface MapCatalogEntry {
+  id: string
+  slug: string
+  name: string
+  description: string
+  author: string
+  minecraft_version: string
+  download_url: string
+  page_url: string
+  thumbnail_url: string
+  category: 'official' | 'community'
+}
+
+export interface MapCatalog {
+  source: 'live' | 'fallback'
+  maps: MapCatalogEntry[]
+}
+
 export interface Backup {
   id: string
   server_id: string

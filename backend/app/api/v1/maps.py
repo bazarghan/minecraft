@@ -10,7 +10,8 @@ from ...audit import record_audit
 from ...config import get_settings
 from ...deps import CurrentUser, Db, Operator
 from ...models import BackgroundJob, JobStatus, Map
-from ...schemas import JobOut, MapInstallRequest, MapOut, MapUrlImport
+from ...schemas import JobOut, MapCatalogOut, MapInstallRequest, MapOut, MapUrlImport
+from ...services.hielke_catalog import get_hielke_catalog
 from ...tasks import import_map_url, install_map, register_map_archive
 
 
@@ -22,6 +23,12 @@ async def list_maps(_: CurrentUser, db: Db, offset: int = 0, limit: int = 50):
     return (
         await db.execute(select(Map).order_by(Map.created_at.desc()).offset(max(offset, 0)).limit(min(limit, 100)))
     ).scalars().all()
+
+
+@router.get("/catalog", response_model=MapCatalogOut)
+async def map_catalog(_: CurrentUser):
+    maps, source = await get_hielke_catalog()
+    return {"maps": maps, "source": source}
 
 
 @router.post("/url", response_model=JobOut, status_code=status.HTTP_202_ACCEPTED)

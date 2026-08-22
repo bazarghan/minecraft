@@ -1,10 +1,17 @@
+import os
 import stat
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from app.services.map_import import UnsafeMapError, _validate_public_url, extract_world, inspect_zip
+from app.services.map_import import (
+    UnsafeMapError,
+    _validate_public_url,
+    extract_world,
+    inspect_zip,
+    store_archive,
+)
 
 
 def make_zip(path: Path, files: dict[str, bytes]) -> None:
@@ -57,6 +64,42 @@ def test_rejects_large_highly_compressible_entries(tmp_path: Path) -> None:
 
     with pytest.raises(UnsafeMapError, match="suspicious compression ratio"):
         inspect_zip(archive)
+
+
+def test_stores_download_via_destination_filesystem(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source_dir = tmp_path / "download"
+    library = tmp_path / "library"
+    source_dir.mkdir()
+    library.mkdir()
+    source = source_dir / "map.zip"
+    destination = library / "checksum.zip"
+    source.write_bytes(b"map data")
+    real_replace = os.replace
+    replacements: list[tuple[Path, Path]] = []
+
+    def record_replace(staged: str | Path, target: str | Path) -> None:
+        replacements.append((Path(staged), Path(target)))
+        real_replace(staged, target)
+
+    monkeypatch.setattr("app.services.map_import.os.replace", record_replace)
+    store_archive(source, destination)
+
+    assert destination.read_bytes() == b"map data"
+    assert not source.exists()
+    assert replacements[0][0].parent == library
+    assert replacements[0][1] == destination
+
+
+def test_storing_duplicate_archive_keeps_existing_file(tmp_path: Path) -> None:
+    source = tmp_path / "download.zip"
+    destination = tmp_path / "existing.zip"
+    source.write_bytes(b"duplicate")
+    destination.write_bytes(b"existing")
+
+    store_archive(source, destination)
+
+    assert destination.read_bytes() == b"existing"
+    assert not source.exists()
 
 
 @pytest.mark.parametrize("url", ["file:///etc/passwd", "http://127.0.0.1/map.zip", "http://169.254.169.254/latest", "http://[::1]/map.zip"])
