@@ -1,0 +1,108 @@
+name: minecraft-server-manager
+services:
+  caddy:
+    image: caddy:2.9.1-alpine
+    restart: unless-stopped
+    environment:
+      MSM_DOMAIN: ${MSM_DOMAIN:?Set MSM_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [backend, frontend]
+    networks: [edge, internal]
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    networks: [internal]
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    command: ["sh", "-c", "alembic upgrade head && minecraft-manager bootstrap-admin-from-env && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*"]
+    env_file: .env
+    environment:
+      MSM_DATABASE_URL: postgresql+psycopg://manager:${POSTGRES_PASSWORD}@postgres/manager
+      MSM_REDIS_URL: redis://redis:6379/0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${MSM_DATA_ROOT:-/srv/minecraft-manager/servers}:/srv/minecraft-manager/servers
+      - ${MSM_MAP_ROOT:-/srv/minecraft-manager/maps}:/srv/minecraft-manager/maps
+      - ${MSM_BACKUP_ROOT:-/srv/minecraft-manager/backups}:/srv/minecraft-manager/backups
+    group_add: ["${DOCKER_GID:-998}"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    command: ["celery", "-A", "app.tasks.celery", "worker", "--loglevel=INFO", "--concurrency=2"]
+    env_file: .env
+    environment:
+      MSM_DATABASE_URL: postgresql+psycopg://manager:${POSTGRES_PASSWORD}@postgres/manager
+      MSM_REDIS_URL: redis://redis:6379/0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${MSM_DATA_ROOT:-/srv/minecraft-manager/servers}:/srv/minecraft-manager/servers
+      - ${MSM_MAP_ROOT:-/srv/minecraft-manager/maps}:/srv/minecraft-manager/maps
+      - ${MSM_BACKUP_ROOT:-/srv/minecraft-manager/backups}:/srv/minecraft-manager/backups
+    group_add: ["${DOCKER_GID:-998}"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    command: ["celery", "-A", "app.tasks.celery", "beat", "--loglevel=INFO"]
+    env_file: .env
+    environment:
+      MSM_DATABASE_URL: postgresql+psycopg://manager:${POSTGRES_PASSWORD}@postgres/manager
+      MSM_REDIS_URL: redis://redis:6379/0
+    depends_on: [worker]
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  postgres:
+    image: postgres:17.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: manager
+      POSTGRES_USER: manager
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U manager -d manager"], interval: 10s, timeout: 5s, retries: 10}
+    networks: [internal]
+
+  redis:
+    image: redis:7.4.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes: [redis_data:/data]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 5s, retries: 10}
+    networks: [internal]
+
+networks:
+  edge:
+  internal:
+    internal: true
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

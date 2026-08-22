@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a focused improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes: {label: Problem, description: What operator or contributor problem should be solved?}
+    validations: {required: true}
+  - type: textarea
+    id: proposal
+    attributes: {label: Proposed solution}
+    validations: {required: true}
+  - type: textarea
+    id: security
+    attributes: {label: Security and data impact, description: Consider Docker privileges, secrets, worlds, networking, and recovery.}
+    validations: {required: true}
