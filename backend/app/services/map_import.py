@@ -17,6 +17,10 @@ class UnsafeMapError(ValueError):
     pass
 
 
+MAX_COMPRESSION_RATIO = 200
+MIN_RATIO_CHECK_BYTES = 1024 * 1024
+
+
 def _safe_destination(root: Path, member_name: str) -> Path:
     pure = PurePosixPath(member_name.replace("\\", "/"))
     if pure.is_absolute() or ".." in pure.parts or "\x00" in member_name:
@@ -44,7 +48,13 @@ def inspect_zip(archive: Path) -> tuple[int, int]:
             total_size += member.file_size
             if total_size > settings.max_extracted_mb * 1024 * 1024:
                 raise UnsafeMapError("Archive expands beyond the configured limit")
-            if member.compress_size and member.file_size / member.compress_size > 200:
+            # Empty Minecraft region files can legitimately compress from 8 KiB
+            # to only a few bytes. A high ratio is only dangerous when the entry
+            # is also large enough to consume meaningful extraction resources.
+            if (
+                member.file_size >= MIN_RATIO_CHECK_BYTES
+                and member.file_size > member.compress_size * MAX_COMPRESSION_RATIO
+            ):
                 raise UnsafeMapError("Archive contains a suspicious compression ratio")
     return len(members), total_size
 

@@ -40,6 +40,25 @@ def test_rejects_zip_symlink(tmp_path: Path) -> None:
         inspect_zip(archive)
 
 
+def test_allows_small_highly_compressible_minecraft_region_files(tmp_path: Path) -> None:
+    archive = tmp_path / "world.zip"
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as source:
+        source.writestr("world/level.dat", b"level")
+        source.writestr("world/region/r.0.0.mca", b"\0" * 8192)
+
+    assert inspect_zip(archive) == (2, 8197)
+
+
+def test_rejects_large_highly_compressible_entries(tmp_path: Path) -> None:
+    archive = tmp_path / "bomb.zip"
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as source:
+        source.writestr("world/level.dat", b"level")
+        source.writestr("world/region/r.0.0.mca", b"\0" * (2 * 1024 * 1024))
+
+    with pytest.raises(UnsafeMapError, match="suspicious compression ratio"):
+        inspect_zip(archive)
+
+
 @pytest.mark.parametrize("url", ["file:///etc/passwd", "http://127.0.0.1/map.zip", "http://169.254.169.254/latest", "http://[::1]/map.zip"])
 def test_url_validation_blocks_unsupported_and_private_targets(url: str) -> None:
     with pytest.raises(UnsafeMapError):
