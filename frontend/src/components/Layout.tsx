@@ -1,7 +1,7 @@
 import { Activity, Archive, Boxes, ChevronLeft, ClipboardList, LogOut, Map, Menu, Plus, Server, Settings, Shield, UserRound, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../auth'
+import { useAuth } from '../useAuth'
 
 const links = [
   { to: '/', label: 'Overview', icon: Activity },

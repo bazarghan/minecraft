@@ -1,6 +1,6 @@
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
 import { FormEvent, useState } from 'react'
-import { useAuth } from '../auth'
+import { useAuth } from '../useAuth'
 
 export function LoginPage() {
   const { login } = useAuth()

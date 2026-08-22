@@ -1,12 +1,12 @@
 import { Globe, Map as MapIcon, Upload } from 'lucide-react'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { api, post } from '../api'
 import { Empty, ErrorState, Loading } from '../components/States'
 import type { Job, MapEntry, Server } from '../types'
 
 export function MapsPage() {
   const [maps,setMaps] = useState<MapEntry[]|null>(null); const [servers,setServers]=useState<Server[]>([]); const [error,setError]=useState(''); const [message,setMessage]=useState(''); const [url,setUrl]=useState(''); const [name,setName]=useState(''); const [serverId,setServerId]=useState('')
-  const load=()=>Promise.all([api<MapEntry[]>('/maps'),api<Server[]>('/servers')]).then(([m,s])=>{setMaps(m);setServers(s);if(!serverId&&s[0])setServerId(s[0].id)}).catch(e=>setError(e.message)); useEffect(()=>{load()},[])
+  const load=useCallback(()=>Promise.all([api<MapEntry[]>('/maps'),api<Server[]>('/servers')]).then(([m,s])=>{setMaps(m);setServers(s);setServerId(current=>current||s[0]?.id||'');setError('')}).catch(e=>setError(e.message)),[]); useEffect(()=>{void load()},[load])
   async function importUrl(e:FormEvent){e.preventDefault(); try{const job=await post<Job>('/maps/url',{url,name,description:'',author:null,minecraft_version:null});setMessage(`Import queued as job ${job.id.slice(0,8)}.`);setUrl('');setName('')}catch(reason){setMessage(reason instanceof Error?reason.message:'Import failed')}}
   async function upload(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);try{const job=await api<Job>('/maps/upload',{method:'POST',body:data});setMessage(`Upload queued as job ${job.id.slice(0,8)}.`);e.currentTarget.reset()}catch(reason){setMessage(reason instanceof Error?reason.message:'Upload failed')}}
   async function install(mapId:string){if(!serverId){setMessage('Choose a target server first.');return}try{await post(`/maps/${mapId}/install`,{server_id:serverId,restart_after_install:true});setMessage('Map installation queued. The current world will be backed up first.')}catch(reason){setMessage(reason instanceof Error?reason.message:'Install failed')}}
