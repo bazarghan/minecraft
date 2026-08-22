@@ -13,7 +13,7 @@ app = typer.Typer(help="Minecraft Server Manager administration commands")
 
 
 def sync_url() -> str:
-    return get_settings().database_url.replace("+psycopg", "")
+    return get_settings().database_url
 
 
 @app.command("bootstrap-admin")

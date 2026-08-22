@@ -31,7 +31,7 @@ celery.conf.update(
         "scheduled-backup-scan": {"task": "scheduled_backups", "schedule": 3600.0},
     },
 )
-sync_engine = create_engine(settings.database_url.replace("+psycopg", ""), pool_pre_ping=True)
+sync_engine = create_engine(settings.database_url, pool_pre_ping=True)
 
 
 def _job(db: DbSession, job_id: str) -> BackgroundJob:
