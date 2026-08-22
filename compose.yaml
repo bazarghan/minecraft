@@ -68,7 +68,7 @@ services:
   scheduler:
     build: ./backend
     restart: unless-stopped
-    command: ["celery", "-A", "app.tasks.celery", "beat", "--loglevel=INFO"]
+    command: ["celery", "-A", "app.tasks.celery", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
     env_file: .env
     environment:
       MSM_DATABASE_URL: postgresql+psycopg://manager:${POSTGRES_PASSWORD}@postgres/manager
