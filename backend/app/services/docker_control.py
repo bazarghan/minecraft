@@ -1,4 +1,5 @@
 import asyncio
+import re
 from dataclasses import dataclass
 
 import docker
@@ -37,8 +38,28 @@ class DockerControl:
 
     @staticmethod
     def image_for(server: MinecraftServer) -> str:
-        if server.version == "26.1.1":
+        version = server.version.lower()
+        if version == "latest" or re.match(r"^2[6-9](?:\.|$)", version):
             return "itzg/minecraft-server:java25"
+        match = re.match(r"^1\.(\d+)(?:\.(\d+))?", version)
+        if match:
+            minor = int(match.group(1))
+            patch = int(match.group(2) or 0)
+            if minor >= 21 or (minor == 20 and patch >= 5):
+                return "itzg/minecraft-server:java21"
+            if minor >= 18:
+                return "itzg/minecraft-server:java17"
+            if minor == 17:
+                return "itzg/minecraft-server:java16"
+            return "itzg/minecraft-server:java8"
+        snapshot = re.match(r"^(\d{2})w\d{2}[a-z]", version)
+        if snapshot:
+            year = int(snapshot.group(1))
+            if year >= 24:
+                return "itzg/minecraft-server:java21"
+            if year >= 21:
+                return "itzg/minecraft-server:java17"
+            return "itzg/minecraft-server:java8"
         return "itzg/minecraft-server:java21"
 
     def _owned_container(self, server: MinecraftServer):

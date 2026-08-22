@@ -148,10 +148,6 @@ async def recreate_server(server_id: uuid.UUID, payload: ServerRecreate, request
     if server.status not in {ServerStatus.created, ServerStatus.stopped, ServerStatus.failed}:
         raise HTTPException(status_code=409, detail="Stop the server before recreating it")
     new_memory = payload.memory_mb or server.memory_mb
-    proposed_version = payload.version or server.version
-    proposed_type = payload.server_type or server.server_type
-    if proposed_type == "FORGE" and proposed_version == "26.1.1":
-        raise HTTPException(status_code=422, detail="Forge compatibility for Minecraft 26.1.1 is not allowlisted")
     await require_capacity(db, new_memory, already_reserved_mb=server.memory_mb)
     backup_id = uuid.uuid4()
     try:

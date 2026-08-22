@@ -38,6 +38,18 @@ export interface Server {
   created_at: string
 }
 
+export interface MinecraftVersion {
+  id: string
+  type: 'release' | 'snapshot' | 'old_beta' | 'old_alpha'
+  release_time: string
+}
+
+export interface MinecraftVersionCatalog {
+  latest: string
+  source: 'mojang' | 'fallback'
+  versions: MinecraftVersion[]
+}
+
 export interface HostMetrics {
   total_memory_mb: number
   reserved_host_memory_mb: number

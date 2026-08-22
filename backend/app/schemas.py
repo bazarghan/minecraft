@@ -69,7 +69,7 @@ class LoginResponse(BaseModel):
 class ServerCreate(BaseModel):
     name: Annotated[str, Field(min_length=2, max_length=100)]
     slug: Slug
-    version: Annotated[str, Field(min_length=1, max_length=32)] = "26.1.1"
+    version: Annotated[str, Field(min_length=1, max_length=32)] = "26.2"
     server_type: Literal["VANILLA", "PAPER", "FABRIC", "FORGE"] = "VANILLA"
     eula_accepted: Literal[True]
     memory_mb: int = Field(default=2048, ge=1024, le=131072, multiple_of=256)
@@ -110,8 +110,6 @@ class ServerCreate(BaseModel):
     def confirm_offline_mode(self) -> "ServerCreate":
         if not self.online_mode and not self.offline_mode_confirmed:
             raise ValueError("offline mode requires explicit security confirmation")
-        if self.server_type == "FORGE" and self.version == "26.1.1":
-            raise ValueError("Forge compatibility for Minecraft 26.1.1 is not allowlisted")
         return self
 
 

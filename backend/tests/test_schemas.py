@@ -8,7 +8,7 @@ def valid_server(**overrides):
     values = {
         "name": "Parkour One",
         "slug": "parkour-one",
-        "version": "26.1.1",
+        "version": "26.2",
         "server_type": "VANILLA",
         "eula_accepted": True,
     }
@@ -27,9 +27,8 @@ def test_offline_mode_requires_separate_confirmation() -> None:
     assert valid_server(online_mode=False, offline_mode_confirmed=True).online_mode is False
 
 
-def test_forge_26_is_not_allowlisted() -> None:
-    with pytest.raises(ValidationError, match="Forge compatibility"):
-        valid_server(server_type="FORGE")
+def test_forge_26_is_accepted_when_supported_by_upstream() -> None:
+    assert valid_server(server_type="FORGE").version == "26.2"
 
 
 def test_player_names_and_console_are_strictly_validated() -> None:

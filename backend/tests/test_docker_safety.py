@@ -39,3 +39,23 @@ def test_accepts_only_all_matching_ownership_labels() -> None:
     item = server()
     container = SimpleNamespace(labels={MANAGED_LABEL: "true", SERVER_ID_LABEL: str(item.id), PROJECT_LABEL: PROJECT_NAME})
     assert control_with(container)._owned_container(item) is container
+
+
+@pytest.mark.parametrize(
+    ("version", "tag"),
+    [
+        ("26.2", "java25"),
+        ("26.1.1", "java25"),
+        ("1.21.11", "java21"),
+        ("1.20.6", "java21"),
+        ("1.20.4", "java17"),
+        ("1.18.2", "java17"),
+        ("1.17.1", "java16"),
+        ("1.16.5", "java8"),
+        ("1.8.9", "java8"),
+    ],
+)
+def test_selects_compatible_java_image(version: str, tag: str) -> None:
+    item = server()
+    item.version = version
+    assert DockerControl.image_for(item) == f"itzg/minecraft-server:{tag}"
