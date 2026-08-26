@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from docker.errors import DockerException, NotFound
 from fastapi import APIRouter, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from ...audit import record_audit
 from ...deps import CurrentUser, Db, Operator
@@ -19,6 +20,20 @@ from ...services.backups import create_backup, server_data_path
 
 router = APIRouter(prefix="/servers", tags=["Minecraft servers"])
 TRANSITIONAL = {ServerStatus.starting, ServerStatus.stopping, ServerStatus.deleting}
+
+
+def _creation_conflict_message(exc: IntegrityError) -> str:
+    constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+    if constraint in {"minecraft_servers_port_key", "uq_minecraft_servers_active_port"}:
+        return "Minecraft port is already allocated"
+    if constraint in {
+        "minecraft_servers_name_key",
+        "ix_minecraft_servers_slug",
+        "uq_minecraft_servers_active_name",
+        "uq_minecraft_servers_active_slug",
+    }:
+        return "Server name or slug already exists"
+    return "Server name, slug, or port conflicts with another active server"
 
 
 async def get_server(db: Db, server_id: uuid.UUID, *, locked: bool = False) -> MinecraftServer:
@@ -66,7 +81,11 @@ async def create_server(payload: ServerCreate, request: Request, operator: Opera
         rcon_password_encrypted=encrypt_secret(random_token(32)),
     )
     db.add(server)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=_creation_conflict_message(exc)) from exc
     try:
         container = await run_docker(DockerControl().create, server)
         server.container_id = container.id

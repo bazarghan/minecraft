@@ -9,10 +9,12 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -83,14 +85,37 @@ class Session(TimestampMixin, Base):
 
 class MinecraftServer(TimestampMixin, Base):
     __tablename__ = "minecraft_servers"
+    __table_args__ = (
+        Index(
+            "uq_minecraft_servers_active_name",
+            "name",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "uq_minecraft_servers_active_slug",
+            "slug",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "uq_minecraft_servers_active_port",
+            "port",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+    )
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
-    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    slug: Mapped[str] = mapped_column(String(64))
     version: Mapped[str] = mapped_column(String(32))
     server_type: Mapped[str] = mapped_column(String(16))
     status: Mapped[ServerStatus] = mapped_column(Enum(ServerStatus), default=ServerStatus.created)
     container_id: Mapped[str | None] = mapped_column(String(128))
-    port: Mapped[int] = mapped_column(Integer, unique=True)
+    port: Mapped[int] = mapped_column(Integer)
     memory_mb: Mapped[int] = mapped_column(Integer)
     cpu_limit: Mapped[float] = mapped_column()
     max_players: Mapped[int] = mapped_column(Integer, default=20)
