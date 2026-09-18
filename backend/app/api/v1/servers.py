@@ -264,6 +264,7 @@ async def duplicate_server(server_id: uuid.UUID, payload: dict, request: Request
         simulation_distance=source.simulation_distance,
         motd=source.motd,
         level_name=source.level_name,
+        level_type=source.level_type,
         online_mode=source.online_mode,
         offline_mode_confirmed=not source.online_mode,
         whitelist=source.whitelist,

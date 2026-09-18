@@ -31,6 +31,13 @@ def test_forge_26_is_accepted_when_supported_by_upstream() -> None:
     assert valid_server(server_type="FORGE").version == "26.2"
 
 
+def test_world_type_defaults_to_normal_and_rejects_unknown_types() -> None:
+    assert valid_server().level_type == "minecraft:normal"
+    assert valid_server(level_type="minecraft:flat").level_type == "minecraft:flat"
+    with pytest.raises(ValidationError):
+        valid_server(level_type="CUSTOMIZED")
+
+
 def test_player_names_and_console_are_strictly_validated() -> None:
     with pytest.raises(ValidationError):
         valid_server(operators=["../../owner"])

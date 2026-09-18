@@ -108,6 +108,8 @@ class DockerControl:
         }
         if server.world_seed:
             environment["SEED"] = server.world_seed
+        if server.level_type:
+            environment["LEVEL_TYPE"] = server.level_type
         if server.whitelist:
             environment["WHITELIST"] = ",".join(server.whitelist)
             environment["ENFORCE_WHITELIST"] = "TRUE"

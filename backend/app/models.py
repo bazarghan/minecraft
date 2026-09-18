@@ -128,6 +128,7 @@ class MinecraftServer(TimestampMixin, Base):
     motd: Mapped[str] = mapped_column(String(256), default="A Minecraft Server")
     world_seed: Mapped[str | None] = mapped_column(String(128))
     level_name: Mapped[str] = mapped_column(String(64), default="world")
+    level_type: Mapped[str] = mapped_column(String(64), default="minecraft:normal")
     online_mode: Mapped[bool] = mapped_column(Boolean, default=True)
     whitelist: Mapped[list[str]] = mapped_column(JSON, default=list)
     operators: Mapped[list[str]] = mapped_column(JSON, default=list)

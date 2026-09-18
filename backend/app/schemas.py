@@ -10,6 +10,13 @@ from .models import JobStatus, Role, ServerStatus
 
 Username = Annotated[str, Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_.-]+$")]
 Slug = Annotated[str, Field(min_length=2, max_length=64, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
+WorldType = Literal[
+    "minecraft:normal",
+    "minecraft:flat",
+    "minecraft:large_biomes",
+    "minecraft:amplified",
+    "minecraft:single_biome_surface",
+]
 
 
 class ORMModel(BaseModel):
@@ -84,6 +91,7 @@ class ServerCreate(BaseModel):
     motd: str = Field(default="A Minecraft Server", max_length=256)
     world_seed: str | None = Field(default=None, max_length=128)
     level_name: str = Field(default="world", min_length=1, max_length=64)
+    level_type: WorldType = "minecraft:normal"
     online_mode: bool = True
     offline_mode_confirmed: bool = False
     whitelist: list[str] = Field(default_factory=list, max_length=1000)
@@ -153,6 +161,7 @@ class ServerOut(ORMModel):
     simulation_distance: int
     motd: str
     level_name: str
+    level_type: str
     online_mode: bool
     whitelist: list[str]
     operators: list[str]

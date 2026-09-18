@@ -29,6 +29,7 @@ export interface Server {
   simulation_distance: number
   motd: string
   level_name: string
+  level_type: string
   online_mode: boolean
   whitelist: string[]
   operators: string[]
